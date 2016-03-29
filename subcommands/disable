@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
+source "$(dirname "$0")/../functions"
+
+api_disable_cmd() {
+  declare desc="Stops the api server and socket container"
+  local cmd="api:disable"
+  api_disable "$1"
+}
+
+api_disable_cmd "$@"

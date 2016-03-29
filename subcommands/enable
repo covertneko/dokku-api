@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
+source "$(dirname "$0")/../functions"
+
+api_enable_cmd() {
+  declare desc="Starts the api server and socket container"
+  local cmd="api:enable"
+  api_enable "$1"
+}
+
+api_enable_cmd "$@"

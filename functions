@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
+source "$PLUGIN_CORE_AVAILABLE_PATH/common/functions"
+source "$(dirname "$0")/config"
+
+api_cache() {
+  declare desc="send a command to the api cache socket"
+
+  [[ -z $1 ]] && dokku_log_fail "Please specify an command to run"
+
+  local cmd="$1"
+  shift
+
+  $(dirname "$0")/dokku-api/bin/dokku-api \
+    --socket-dir $API_SOCKET_DIR \
+    cache:$cmd $@
+}
+
+api_container() {
+  declare desc="get the name of the data container containing the api socket"
+  echo "$API_CONTAINER_NAME"
+}
+
+api_enable() {
+  declare desc="start the api server and socket container"
+
+  dokku_log_info1 "Starting api service..."
+
+  local status=$(supervisorctl start dokku-api | grep "ERROR") || true
+  [[ -n $status ]] && dokku_log_warn "Api service is already running"
+  [[ -z $status ]] && dokku_log_info1 "Api service started"
+
+  dokku_log_info1 "Starting api container..."
+
+  local ID=$(docker run \
+    --rm \
+    --name "${api_container}" \
+    --entrypoint /bin/echo \
+    -v "$API_SOCKET_DIR" \
+    "$DOKKU_IMAGE" dokku-api socket container) || true
+  [[ -z $ID ]] && dokku_log_warn "Api container is already running" && return 0
+  [[ -n $ID ]] && dokku_log_info1 "Api container started"
+}
+
+api_disable() {
+  declare desc="stop the api server and socket container"
+
+  dokku_log_info1 "Stopping api service..."
+
+  local status=$(supervisorctl stop dokku-api | grep "ERROR") || true
+  [[ -n $status ]] && dokku_log_warn "Api service is not running"
+  [[ -z $status ]] && dokku_log_info1 "Api service stopped"
+
+  dokku_log_info1 "Stopping api container..."
+
+  local ID=$(docker ps -f status=running | grep "${api_container}" | awk '{print $1}') || true
+  [[ -z $ID ]] && dokku_log_warn "Api container is not running" && return 0
+
+  if [[ -n $ID ]]; then
+    docker stop "${api_container}" > /dev/null
+    dokku_log_info1 "Api container stopped"
+  fi
+}
+
+api_link() {
+  declare desc="expose the api socket to an app container"
+
+  [[ -z $2 ]] && dokku_log_fail "Please specify an app to run the command on"
+  verify_app_name "$2" && local APP="$2"
+
+  api_app_is_linked "$APP" && dokku_log_fail "Api is already linked to app $APP"
+
+  dokku docker-options:add "$APP" build,deploy,run "--volumes-from '${api_container}'"
+  dokku config:set "$APP" DOKKU_API_SOCKET="$API_SOCKET_URL"
+}
+
+api_unlink() {
+  declare desc="un-expose the api socket to an app container"
+
+  [[ -z $2 ]] && dokku_log_fail "Please specify an app to run the command on"
+  verify_app_name "$2" && local APP="$2"
+
+  api_app_is_linked "$APP" || dokku_log_fail "Api is not linked to app $APP"
+
+  dokku docker_options:remove "$APP" build,deploy,run "--volumes-from '${api_container}'"
+  dokku config:unset "$APP" DOKKU_API_SOCKET
+}
+
+api_app_is_linked() {
+  declare desc="check if an app is linked to the api"
+
+  [[ -z $2 ]] && dokku_log_fail "Please specify an app to run the command on"
+  verify_app_name "$2" && local APP="$2"
+
+  local islinked=$(dokku config:get "$APP" DOKKU_API_SOCKET) || true
+  if [[ -n $islinked ]]; then
+    return true
+  else
+    return false
+  fi
+}
+
+api_is_running() {
+  declare desc="check if the api service is running"
+
+  local status=$(supervisorctl status dokku-api | grep "RUNNING") || true
+  local ID=$(docker ps -f status=running | grep "${api_container}" | awk '{print $1}') || true
+
+  return [[ -n $status ]] && [[ -n $ID ]]
+}

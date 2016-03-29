@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
+source "$(dirname "$0")/../functions"
+
+api_unlink_cmd() {
+  declare desc="Un-exposes the api to an app"
+  local cmd="api:unlink"
+  api_unlink "$1"
+}
+
+api_unlink_cmd "$@"

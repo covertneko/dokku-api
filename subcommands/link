@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
+source "$(dirname "$0")/../functions"
+
+api_link_cmd() {
+  declare desc="Exposes the api to an app"
+  local cmd="api:link"
+  api_link "$1"
+}
+
+api_link_cmd "$@"

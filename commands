@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
+source "$(dirname "$0")/functions"
+
+case "$1" in
+  help | api:help)
+    cat <<EOF
+    api, Print api status
+    api:enable, Start the api service and socket container
+    api:disable, Stop the api service and socket container
+    api:link <app>, Expose the api to an app
+    api:unlink <app>, Un-expose the api to an app
+EOF
+    ;;
+
+  api)
+    if api_is_running; then
+      echo "API service is running"
+    else
+      echo "API service is not running"
+    fi
+    ;;
+
+  *)
+    exit $DOKKU_NOT_IMPLEMENTED_EXIT
+    ;;
+
+esac

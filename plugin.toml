@@ -1,0 +1,4 @@
+[plugin]
+description = "A JSON API for administering a Dokku instance"
+version = "0.1.0"
+[plugin.config]
